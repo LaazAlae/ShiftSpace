@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" type="text/css" href="/static/css/styles.css">
+  <script src="/static/js/script.js"></script>
+  <title>ShiftSpace</title>
+</head>
+<body>
+  <header>
+    <h1 id="title">ShiftSpace</h1>
+    <img id="carIcon" src="/static/carIcon.jpg" alt="Car Icon">
+  </header>
+
+  <div id="register">
+    <h2>Register</h2>
+    <form method="POST" action="/register">
+      <label for="username">Username:</label>
+      <input type="text" id="username" name="username">
+      <label for="password">Password:</label>
+      <input type="password" id="password" name="password">
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+
+  <div id="login">
+    <h2>Login</h2>
+    <form method="POST" action="/login">
+      <label for="username">Username:</label>
+      <input type="text" id="username" name="username">
+      <label for="password">Password:</label>
+      <input type="password" id="password" name="password">
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+
+  <div id="postArea">
+    <h2>Post Area</h2>
+    <textarea id="postContent"></textarea>
+    <button onclick="postMessage()">Post</button>
+    <div id="posts"></div>
+  </div>
+</body>
+</html>
