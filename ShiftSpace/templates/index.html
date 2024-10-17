@@ -11,7 +11,7 @@
     <h1>ShiftSpace's Web Page</h1>
     <img src="static/images/logo.png">
     <div class="user-info">
-        <p>Welcome, {{ Guest }}</p>
+        <p id="welcome">Welcome, {{ Guest }}</p>
         {% if username != 'Guest' %}
         <form action="/logout" method="get">
             <button type="submit">Logout</button>
@@ -26,6 +26,10 @@
             <form action="/register" method="post">
                 <input type="text" name="username" placeholder="Username" required>
                 <input type="password" name="password" placeholder="Password" required>
+                <p id="password requirement">Password must be in alphabet and have at least length of 8;
+                    at least 1 capital; at least 1 special character which is !@#$%^&()_-=
+                </p>
+                <input type="password" name="confirm_password" placeholder="Confirm Password" required>
                 <button type="submit">Register</button>
             </form>
         </div>
@@ -45,6 +49,15 @@
             <button type="submit">Post</button>
         </form>
     </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="messages">
+                {% for category, message in messages %}
+                    <div class="{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
     <script src="/static/script.js"></script>
 </body>
 </html>

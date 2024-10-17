@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, session
-
+from flask import Flask, render_template, request, redirect, url_for, session, flash, get_flashed_messages
+import extraFunction
 app = Flask(__name__)
 
 @app.route('/')
@@ -16,6 +16,30 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('username', None)
+    return redirect(url_for('home'))
+
+@app.route('/register', methods=['POST'])
+def register():
+    username = request.form['username']
+    password = request.form['password']
+    confirm_password = request.form['confirm_password']
+
+    if len(username) < 6:
+        flash('Username must be at least 6 characters long.', 'error')
+        return redirect(url_for('home'))
+
+    if extraFunction.validate_password == False:
+        flash('Passwords Requirement Missing', 'error')
+        return redirect(url_for('home'))
+
+    if password != confirm_password:
+        flash('Passwords do not match.', 'error')
+        return redirect(url_for('home'))
+    
+    #==================================================================
+    #######========== store to db right here ==================########
+    #==================================================================
+    flash('Registration successful! Please log in.', 'success')
     return redirect(url_for('home'))
 
 @app.after_request
