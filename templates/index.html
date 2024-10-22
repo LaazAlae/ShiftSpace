@@ -5,13 +5,24 @@
     <meta charset="UTF-8">
     <title>shiftSpace</title>
     <link rel="stylesheet" href="/static/style.css"/>
+    <link rel="shortcut icon" type="image/x-icon" href="/static/images/favicon.ico">
 </head>
 
 <body>
     <h1>ShiftSpace's Web Page</h1>
-    <img src="static/images/logo.png">
-    <p>test</p>
+
+    <img src="/static/images/logo.png">
+
+    <p>Hello {{usrnm}} !</p>
+
     <div id="myDiv"></div>
     <script src="/static/script.js"></script>
+
+    <form action="/logout" method="post" enctype="application/x-www-form-urlencoded">
+        <label>Log Out:
+            <input type="submit" value="Logout">
+        </label>
+    </form>
+
 </body>
 </html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>shiftSpace</title>
+    <link rel="stylesheet" href="/static/style.css"/>
+    <link rel="shortcut icon" type="image/x-icon" href="/static/images/favicon.ico">
+</head>
+
+<body>
+    <h1>ShiftSpace's Web Page</h1>
+    <img src="static/images/logo.png">
+    <br>
+    Register:
+    {% if error %}
+    <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    <br>
+    <form action="/register" method="post" enctype="application/x-www-form-urlencoded">
+        <label>Username:
+            <br>
+            <input type="text" name="username"/>
+        </label>
+        <br/>
+        <label>Password:&nbsp;
+            <br>
+            <input type="password" name="password">
+        </label>
+        <br/>
+        <label>Confirm Password:&nbsp;
+            <br>
+            <input type="password" name="password verification">
+        </label>
+        <br>
+        <input type="submit" value="Submit">
+    </form>
+    <br>
+    Already have an account? Click here to login
+    <br>
+    <button onclick="window.location.href='/login'">Login</button>
+</body>
+</html>
