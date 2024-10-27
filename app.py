@@ -1,9 +1,11 @@
-from flask import Flask, render_template, redirect, request, url_for, make_response
+from flask import Flask, render_template, redirect, request, url_for, make_response, jsonify
 from pymongo import MongoClient
 from hashlib import sha256
 import html
 import bcrypt
 from uuid import uuid4
+import secrets
+import uuid
 
 
 
@@ -13,6 +15,11 @@ app = Flask(__name__)
 mongo_client = MongoClient("mongodb://mongo:27017/")
 db = mongo_client["shiftSpace"]
 usercred_collection = db["credentials"]
+
+
+mongo_client = MongoClient("mongodb://mongo:27017/")
+db = mongo_client["shiftSpace"]
+TI_collection = db["TravelInfo"]
 
 
 
@@ -27,8 +34,12 @@ def home():
 
     if not user:
         return redirect(url_for('login'))
+    
+    xsrfToken = secrets.token_hex(32)
 
-    return render_template('index.html', usrnm = html.unescape( user["username"] ))
+    usercred_collection.update_one({"authtoken": hashedtoken},{"$set": {"xsrf_token": xsrfToken}})
+
+    return render_template('index.html', usrnm = html.unescape( user["username"] ), xsrf_token = xsrfToken )
         
 
 
@@ -159,6 +170,131 @@ def validate_password(password):
 
     # If all checks pass
     return True, ""
+
+
+
+
+
+
+@app.route('/travel-info', methods = ['GET', 'POST'])
+def travelInfo(): 
+    if request.method == 'POST':
+        return sendInfo(request)
+    
+
+    if request.method == 'GET':
+        history = TI_collection.find({})
+        
+        listHistory = []
+        for i in history:
+            i["_id"] = str(i["_id"])
+            listHistory.append(i)
+            
+        
+        return jsonify(listHistory)
+
+
+
+
+
+def sendInfo(request):
+    authtoken = request.cookies.get('authtoken')
+    decodeInfo = request.get_json()
+    xsrfFromHtml = decodeInfo.get("xsrf_token")
+    
+
+    city = html.escape(decodeInfo.get("city", ""))
+    state = html.escape(decodeInfo.get("state", ""))
+    self = html.escape(decodeInfo.get("self", ""))
+
+    user = usercred_collection.find_one({"authtoken": sha256(str(authtoken).encode('utf-8')).hexdigest()})
+
+    if not user:
+        return jsonify({"status": "error", "message": "User not authenticated"}), 401
+    
+    if xsrfFromHtml != user["xsrf_token"]:
+            return jsonify({"status": "error", "message": "Invalid XSRF token"}), 403
+    
+    unique_id = str(uuid.uuid4())
+
+    decodeInfo["city"] = city
+    decodeInfo["state"] = state
+    decodeInfo["self"] = self
+    decodeInfo["username"] = user["username"]
+    decodeInfo["uniqueid"] = unique_id
+    decodeInfo["drivers"] = []
+    decodeInfo["cars"] = []
+    decodeInfo["passengers"] = []
+
+
+    # Insert into database
+    TI_collection.insert_one(decodeInfo)
+
+    return jsonify({"status": "success", "message": "Info added"}), 200
+
+
+
+@app.route('/update-interactions', methods=['POST'])
+def updateInteractions():
+    # Get authentication token from cookies
+    authtoken = request.cookies.get('authtoken')
+    decodeInfo = request.get_json()
+    xsrfFromHtml = decodeInfo.get("xsrf_token")
+
+    # Verify user authentication
+    user = usercred_collection.find_one({"authtoken": sha256(str(authtoken).encode('utf-8')).hexdigest()})
+    if not user:
+        return jsonify({"status": "error", "message": "User not authenticated"}), 401
+
+    # Verify XSRF token
+    if xsrfFromHtml != user["xsrf_token"]:
+        return jsonify({"status": "error", "message": "Invalid XSRF token"}), 403
+
+   # Get the current user's username
+    username = decodeInfo["interactuser"]
+    option = decodeInfo["option"]
+
+    #find post
+    post = TI_collection.find_one({"uniqueid": decodeInfo["messageId"]})
+    if not post:
+        return jsonify({"status": "error", "message": "Post not found"}), 404
+
+    # Remove user from all interaction arrays 
+    post["drivers"] = [user for user in post["drivers"] if user != username]
+    post["cars"] = [user for user in post["cars"] if user != username]
+    post["passengers"] = [user for user in post["passengers"] if user != username]
+
+    # Add user to selected option
+    if option in ["drivers", "cars", "passengers"]:
+        usersinteracted = post[option]
+        if username not in usersinteracted:
+            usersinteracted.append(username)
+            post[option] = usersinteracted
+
+    # Update the post in the database
+    TI_collection.update_one(
+        {"uniqueid": decodeInfo["messageId"]},
+        {"$set": {
+            "drivers": post["drivers"],
+            "cars": post["cars"],
+            "passengers": post["passengers"]
+        }}
+    )
+
+    return jsonify({
+        "status": "success",
+        "message": "Interaction updated",
+        "updated": {
+            "drivers": post["drivers"],
+            "cars": post["cars"],
+            "passengers": post["passengers"]
+        }
+    }), 200
+
+
+
+
+
 
 
 

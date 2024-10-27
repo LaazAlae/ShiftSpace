@@ -1,38 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>shiftSpace</title>
     <link rel="stylesheet" href="/static/style.css"/>
     <link rel="shortcut icon" type="image/x-icon" href="/static/images/favicon.ico">
 </head>
-
-<body>
-    <h1>ShiftSpace's Web Page</h1>
-    <img src="static/images/logo.png">
-    <br>
-
-    <div id="myDiv"></div>
-    <script src="/static/script.js"></script>
-
-    login:
-    {% if error %}
-    <p style="color: red;">{{ error }}</p>
-    {% endif %}
-    <form action="/login" method="post" enctype="application/x-www-form-urlencoded">
-        <label>Username:
-            <input type="text" name="username" required/>
-        </label>
-        <br/>
-        <label>Password:&nbsp;
-            <input type="password" name="password" required>
-        </label>
-        <input type="submit" value="Post">
-    </form>
-    <br>
-    Don't have an account? Click here to register
-    <br>
-    <button onclick="window.location.href='/register'">Register</button>
+<body class="auth-page">
+    <div class="auth-container">
+        <img src="static/images/logo.png">
+        <h1>Login</h1>
+        {% if error %}
+        <p style="color: red;">{{ error }}</p>
+        {% endif %}
+        <form action="/login" method="post" enctype="application/x-www-form-urlencoded">
+            <div class="form-group">
+                <label>Username:</label>
+                <input type="text" name="username" required/>
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" name="password" required>
+            </div>
+            <input type="submit" value="Submit">
+        </form>
+        <div class="auth-redirect">
+            <p>Don't have an account? Click here to register</p>
+            <button class="secondary-btn" onclick="window.location.href='/register'">Register</button>
+        </div>
+    </div>
 </body>
 </html>

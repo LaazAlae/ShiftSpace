@@ -3,26 +3,62 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>shiftSpace</title>
+    <title>Campus Caravan</title>
     <link rel="stylesheet" href="/static/style.css"/>
     <link rel="shortcut icon" type="image/x-icon" href="/static/images/favicon.ico">
 </head>
 
-<body>
-    <h1>ShiftSpace's Web Page</h1>
+<script>
+    const usrnm = "{{usrnm}}";
+</script>
 
-    <img src="/static/images/logo.png">
+<body onload="start();">
 
-    <p>Hello {{usrnm}} !</p>
+    <div class="header"> 
+        <img src="/static/images/logo.png">
+        <p>Let's go places {{usrnm}} !</p>
+        <div id="myDiv"></div>
+        <script src="/static/script.js"></script>
+    </div>  
 
-    <div id="myDiv"></div>
-    <script src="/static/script.js"></script>
 
-    <form action="/logout" method="post" enctype="application/x-www-form-urlencoded">
-        <label>Log Out:
+
+
+    <div class="contents">
+
+        <div id="travel-info">
+        </div>
+
+        <div class="travel-form">
+            <input value="{{xsrf_token}}" id="xsrf_token" hidden>
+
+            <div class="form-group">
+                <label for="city">City:</label>
+                <input id="city" type="text" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="state">State:</label>
+                <input id="state" type="text" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="self">Bio:</label>
+                <input id="self" type="text" required>
+            </div>
+
+            <button id="sendinfo" onclick="sendinfo()">Send</button>
+        </div>
+
+
+    </div>
+
+
+    <div class="logout">
+        <form action="/logout" method="post" enctype="application/x-www-form-urlencoded">
             <input type="submit" value="Logout">
-        </label>
-    </form>
+        </form>
+    </div> 
 
 </body>
 </html>
