@@ -22,8 +22,7 @@ socketio = SocketIO(app,
         "https://friendsgotogether.com",
         "http://localhost:8080"
     ],
-    transport=['websocket'],
-    async_mode='gevent'
+    transport=['websocket']
 )
 
 

@@ -5,3 +5,8 @@ requests
 flask-socketio
 filetype
 eventlet
+flask-socketio
+python-socketio
+python-engineio
+gevent
+gevent-websocket
