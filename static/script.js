@@ -16,10 +16,13 @@ function start() {
 
 function initWS() {
     //initialize the Socket.IO connection
-    socket = io({
-        transports: ['websocket'],
-        path: '/socket.io'
-    });
+    function initWS() {
+        socket = io({
+            transports: ['websocket'],
+            path: '/socket.io/',  
+            secure: true 
+        });
+    }
 
     //listen for messages from the server
     socket.on('message', function (message) {
