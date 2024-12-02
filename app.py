@@ -17,7 +17,14 @@ import os
 
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app,
+    cors_allowed_origins=[
+        "https://friendsgotogether.com",
+        "http://localhost:8080"
+    ],
+    transport=['websocket'],
+    async_mode='gevent'
+)
 
 
 mongo_client = MongoClient("mongodb://mongo:27017/")
