@@ -7,34 +7,39 @@
     <link rel="shortcut icon" type="image/x-icon" href="/static/images/favicon.ico">
 </head>
 <body class="auth-page">
-    <div class="auth-container">
-        <img src="static/images/logo.png">
-        <h1>Registration</h1>
-        {% if error %}
-        <p style="color: red;">{{ error }}</p>
-        {% endif %}
-        <form action="/register" method="post" enctype="application/x-www-form-urlencoded">
-            <div class="form-group">
-                <label>Username:</label>
-                <input type="text" name="username" required/>
+    <div class="site-layout">
+        <div class="sidebar">
+            <img src="static/images/logo.png" class="logo">
+            <h1>Campus Caravan</h1>
+        </div>
+        
+        <div class="main-content auth-content">
+            <div class="auth-container">
+                <h1>Registration</h1>
+                {% if error %}
+                <p style="color: red;">{{ error }}</p>
+                {% endif %}
+                <form action="/register" method="post" enctype="application/x-www-form-urlencoded">
+                    <div class="form-group">
+                        <label>Username:</label>
+                        <input type="text" name="username" required/>
+                    </div>
+                    <div class="form-group">
+                        <label>Password:</label>
+                        <input type="password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password:</label>
+                        <input type="password" name="password verification" required>
+                    </div>
+                    <input type="submit" value="Submit">
+                </form>
+                <div class="auth-redirect">
+                    <p>Already have an account? Click here to login</p>
+                    <button class="secondary-btn" onclick="window.location.href='/login'">Login</button>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Password:</label>
-                <input type="password" name="password" required>
-            </div>
-            <div class="form-group">
-                <label>Confirm Password:</label>
-                <input type="password" name="password verification" required>
-            </div>
-            <input type="submit" value="Submit">
-        </form>
-        <div class="auth-redirect">
-            <p>Already have an account? Click here to login</p>
-            <button class="secondary-btn" onclick="window.location.href='/login'">Login</button>
         </div>
     </div>
 </body>
 </html>
-
-
-

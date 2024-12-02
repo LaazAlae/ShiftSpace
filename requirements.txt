@@ -2,3 +2,6 @@ Flask
 pymongo
 bcrypt
 requests
+flask-socketio
+filetype
+eventlet

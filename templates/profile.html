@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>shiftSpace - Profile</title>
+    <link rel="stylesheet" href="/static/style.css"/>
+    <link rel="shortcut icon" type="image/x-icon" href="/static/images/favicon.ico">
+</head>
+<script>
+    const usrnm = "{{usrnm}}";
+    const firstnm = "{{firstnm}}";
+    const lastnm = "{{lastnm}}";
+    const pfpsrc = "{{pfpsrc}}"
+</script>
+<body>
+    <div class="site-layout">
+        <div class="sidebar">
+            <img src="static/images/logo.png" class="logo">
+            <h1>Campus Caravan</h1>
+        </div>
+        
+        <div class="main-content auth-content">
+            <div class="auth-container">
+                <div class="profile-picture-container">
+                    <img id="profile-preview" src="{{ pfpsrc }}"
+                         alt="Profile Picture">
+                </div>
+                
+                <h1>Profile</h1>
+                {% if error %}
+                <p style="color: red;">{{ error }}</p>
+                {% endif %}
+                
+                <div class="card" style="width: 100%; max-width: 400px;">
+                    <div class="card-header">
+                        Profile Information
+                    </div>
+                    <div class="card-body" style="padding: 20px;">
+                        <form action="/profile" method="post" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label>Profile Picture:</label>
+                                <input type="file"
+                                       name="profile_picture"
+                                       accept="image/*"
+                                       style="background: none; border: 1px solid #2d2d2d; padding: 8px; width: 100%;"
+                                       onchange="previewImage(this);">
+                            </div>
+                            <div class="form-group">
+                                <label>Username:</label>
+                                <input type="text"
+                                       name="username"
+                                       value="{{ usrnm }}"
+                                       required/>
+                            </div>
+                            <div class="form-group">
+                                <label>First Name:</label>
+                                <input type="text"
+                                       name="first_name"
+                                       value="{{ firstnm }}"
+                                       required/>
+                            </div>
+                            <div class="form-group">
+                                <label>Last Name:</label>
+                                <input type="text"
+                                       name="last_name"
+                                       value="{{ lastnm }}"
+                                       required/>
+                            </div>
+                            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                                <input type="submit" value="Save Changes">
+                                <button type="button"
+                                        class="secondary-btn"
+                                        onclick="window.location.href='/'">
+                                    Back to Home
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profile-preview').src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+</body>
+</html>
