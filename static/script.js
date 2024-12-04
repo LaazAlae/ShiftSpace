@@ -2,9 +2,70 @@ let info = [];
 const ws = true;
 let socket = null;
 let currentMessageId = null;
+let cities = [];
+let states = [];
+
+function loadCitiesAndStates() {
+    fetch('/static/us-cities.txt')
+        .then(response => response.text())
+        .then(text => {
+            cities = text.split('\n').map(city => city.trim()).filter(city => city !== '');
+        });
+    fetch('/static/us-states.txt')
+        .then(response => response.text())
+        .then(text => {
+            states = text.split('\n').map(state => state.trim()).filter(state => state !== '');
+        });
+}
+
+function filterDatalist(input, list, datalistId) {
+    const datalist = document.getElementById(datalistId);
+    const value = input.value.trim().toLowerCase();
+
+    datalist.innerHTML = '';
+
+    if (value === '') {
+        return;
+    }
+
+    const filteredList = list.filter(item => item.toLowerCase().startsWith(value));
+
+    const maxSuggestions = 10;
+    filteredList.slice(0, maxSuggestions).forEach(item => {
+        const option = document.createElement('option');
+        option.value = item;
+        datalist.appendChild(option);
+    });
+}
+
+function validateInput(input, list) {
+    const value = input.value.trim().toLowerCase();
+    const found = list.some(item => item.toLowerCase() === value);
+    if (found || value === '') {
+        input.style.borderColor = '';
+    } else {
+        input.style.borderColor = 'red';
+    }
+}
+
+function disablePastDates() {
+    const today = new Date().toISOString().split('T')[0];
+    const travelDateInput = document.getElementById('travel-date');
+    const lookupDateInput = document.getElementById('lookup-date');
+
+    if (travelDateInput) {
+        travelDateInput.setAttribute('min', today);
+    }
+
+    if (lookupDateInput) {
+        lookupDateInput.setAttribute('min', today);
+    }
+}
 
 function start() {
+    loadCitiesAndStates();
     updateInfo();
+    document.getElementById('home-btn').classList.add('active');
 
     if (ws) {
         initWS();
@@ -12,6 +73,66 @@ function start() {
         setInterval(updateInfo, 3000);
     }
 
+    const cityInputs = [
+        document.getElementById('from-city'),
+        document.getElementById('to-city'),
+        document.getElementById('lookup-from-city'),
+        document.getElementById('lookup-to-city')
+    ];
+
+    const stateInputs = [
+        document.getElementById('from-state'),
+        document.getElementById('to-state'),
+        document.getElementById('lookup-from-state'),
+        document.getElementById('lookup-to-state')
+    ];
+
+    cityInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            filterDatalist(this, cities, 'cities-list');
+            validateInput(this, cities);
+            validateForm();
+        });
+    });
+
+    stateInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            filterDatalist(this, states, 'states-list');
+            validateInput(this, states);
+            validateForm();
+        });
+    });
+
+    const postDetailsInput = document.getElementById('post-details');
+    const postDetailsCount = document.getElementById('post-details-count');
+    postDetailsInput.addEventListener('input', function() {
+        updateCharacterCount(this, postDetailsCount, 300);
+        validateForm();
+    });
+
+    const travelDateInput = document.getElementById('travel-date');
+    travelDateInput.addEventListener('input', validateForm);
+
+    validateForm();
+    disablePastDates();
+}
+
+
+function updateCharacterCount(textarea, countDisplay, maxChars) {
+    const currentLength = textarea.value.length;
+    countDisplay.textContent = `${currentLength}/${maxChars} characters`;
+
+    const postButton = document.getElementById('create-post');
+
+    if (currentLength > maxChars) {
+        textarea.style.borderColor = 'red';
+        countDisplay.classList.add('exceeded');
+        postButton.disabled = true; 
+    } else {
+        textarea.style.borderColor = '';
+        countDisplay.classList.remove('exceeded');
+        postButton.disabled = false; 
+    }
 }
 
 function initWS() {
@@ -123,6 +244,10 @@ function updateInteractionsAJAX(data) {
 
 
 function sendinfo() {
+    if (document.getElementById('create-post').disabled) {
+        return;
+    }
+
     //input elements
     const fromCityInput = document.getElementById("from-city");
     const fromStateInput = document.getElementById("from-state");
@@ -139,7 +264,7 @@ function sendinfo() {
     const travelDate = travelDateInput.value.trim();
     const postDetails = postDetailsInput.value.trim();
 
-    // Validate inputs
+    //validate inputs
     if (fromCity === "") {
         fromCityInput.focus();
     } else if (fromState === "") {
@@ -152,8 +277,11 @@ function sendinfo() {
         travelDateInput.focus();
     } else if (postDetails === "") {
         postDetailsInput.focus();
+    } else if (postDetails.length > 300) {
+        alert('Post description cannot exceed 300 characters.');
+        postDetailsInput.focus();
     } else {
-        //if all inputs are filled
+        // If all inputs valid sendifno
         const xsrf = document.getElementById("xsrf_token").value;
         const infoJSON = {
             "from_city": fromCity,
@@ -179,7 +307,7 @@ function sendinfo() {
             request.send(JSON.stringify(infoJSON));
         }
 
-        //Clear input fields
+        //clear input fields
         fromCityInput.value = "";
         fromStateInput.value = "";
         toCityInput.value = "";
@@ -187,8 +315,78 @@ function sendinfo() {
         travelDateInput.value = "";
         postDetailsInput.value = "";
 
-        //set focus back to the first input
+        updateCharacterCount(postDetailsInput, document.getElementById('post-details-count'), 300);
+
+        //disable the post button since the form is now empty
+        document.getElementById('create-post').disabled = true;
+        
+        //focus back to first input
         fromCityInput.focus();
+        
+        //revalidate the form
+        validateForm();
+    }
+}
+
+
+function validateForm() {
+    const fromCityInput = document.getElementById("from-city");
+    const fromStateInput = document.getElementById("from-state");
+    const toCityInput = document.getElementById("to-city");
+    const toStateInput = document.getElementById("to-state");
+    const travelDateInput = document.getElementById("travel-date");
+    const postDetailsInput = document.getElementById("post-details");
+
+    const fromCity = fromCityInput.value.trim();
+    const fromState = fromStateInput.value.trim();
+    const toCity = toCityInput.value.trim();
+    const toState = toStateInput.value.trim();
+    const travelDate = travelDateInput.value.trim();
+    const postDetails = postDetailsInput.value.trim();
+
+    let isValid = true;
+
+    // validate From City
+    if (fromCity === "" || !cities.some(city => city.toLowerCase() === fromCity.toLowerCase())) {
+        isValid = false;
+    }
+
+    //validate From State
+    if (fromState === "" || !states.some(state => state.toLowerCase() === fromState.toLowerCase())) {
+        isValid = false;
+    }
+
+    //validate To City
+    if (toCity === "" || !cities.some(city => city.toLowerCase() === toCity.toLowerCase())) {
+        isValid = false;
+    }
+
+    //To State
+    if (toState === "" || !states.some(state => state.toLowerCase() === toState.toLowerCase())) {
+        isValid = false;
+    }
+
+    // Validate Travel Date
+    if (travelDate === "") {
+        isValid = false;
+    } else {
+        const today = new Date().toISOString().split('T')[0];
+        if (travelDate < today) {
+            isValid = false;
+        }
+    }
+
+    //post Details
+    if (postDetails === "" || postDetails.length > 300) {
+        isValid = false;
+    }
+
+    const postButton = document.getElementById('create-post');
+
+    if (isValid) {
+        postButton.disabled = false;
+    } else {
+        postButton.disabled = true;
     }
 }
 

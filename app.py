@@ -14,6 +14,10 @@ import bcrypt
 import uuid
 import html
 import os
+from collections import defaultdict, deque
+from time import time
+from functools import wraps
+from flask import request, make_response
 
 
 app = Flask(__name__)
@@ -26,6 +30,54 @@ socketio = SocketIO(app,
 )
 
 
+
+#DOs Protection
+####################################################################################################################################################################################
+#track requests based on IP
+ip_requests = defaultdict(deque)
+# Track blocked IPs with their block timestamp
+blocked = {}
+
+def check_rate_limit():
+    ip = request.remote_addr
+    current_time = time()
+    
+    if ip in blocked:
+        #unblock after 30
+        if current_time - blocked[ip] >= 30:
+            del blocked[ip]
+            ip_requests[ip].clear()
+        else:
+            return False
+    
+    #current request time
+    ip_requests[ip].append(current_time)
+    
+    #remove requests older than 10s
+    while ip_requests[ip] and current_time - ip_requests[ip][0] > 10:
+        ip_requests[ip].popleft()
+    
+    if len(ip_requests[ip]) > 50:
+        #block ip
+        blocked[ip] = current_time
+        return False
+    
+    return True
+
+def rate_limit(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not check_rate_limit():
+            response = make_response("Too many requests. Please try again in 30 seconds.", 429)
+            response.headers["Retry-After"] = "30"
+            return response
+        return f(*args, **kwargs)
+    return decorated_function
+#######################################################################################################################################################################################################################
+
+
+
+
 mongo_client = MongoClient("mongodb://mongo:27017/")
 db = mongo_client["shiftSpace"]
 usercred_collection = db["credentials"]
@@ -36,6 +88,16 @@ db = mongo_client["shiftSpace"]
 TI_collection = db["TravelInfo"]
 
 connected = {}
+
+
+#load cities and states once when the application starts
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+with open(os.path.join(BASE_DIR, 'us-cities.txt'), 'r') as f:
+    us_cities = set(line.strip().lower() for line in f if line.strip())
+
+with open(os.path.join(BASE_DIR, 'us-states.txt'), 'r') as f:
+    us_states = set(line.strip().lower() for line in f if line.strip())
 
 
 
@@ -101,36 +163,71 @@ def disconnect():
 
 
 ####################################################################################################################################################################################
-
 @socketio.on('newPost')
 def newPost(data):
     authtoken = request.cookies.get('authtoken')
     if not authtoken or request.sid not in connected:
-        emit('error', {'message': 'User not authenticated'}, room=request.sid)
+        #user not authenticated
         return
 
     user = usercred_collection.find_one({"authtoken": sha256(str(authtoken).encode('utf-8')).hexdigest()})
     if not user or data.get("xsrf_token") != user.get("xsrf_token"):
-        emit('error', {'message': 'Invalid XSRF token or authentication'}, room=request.sid)
+        #invalid XSRF token or authentication
         return 
-    
+
     pfpsource = user.get("pfpsrc", "/static/images/default.png")
     if pfpsource.startswith("/app/userUploads/"):
        pfpsource = pfpsource.replace("/app/userUploads/", "/userUploads/")
 
+    # Extract and sanitize input data
+    from_city = data.get("from_city", "").strip()
+    from_state = data.get("from_state", "").strip()
+    to_city = data.get("to_city", "").strip()
+    to_state = data.get("to_state", "").strip()
+    travel_date = data.get("travel_date", "").strip()
+    post_details = data.get("post_details", "").strip()
 
-    postDetails = data.get("post_details", "")
-    if len(postDetails) > 500:
-        emit('error', {'message': 'Journey details exceed maximum length'}, room=request.sid)
+    #backend validation checks
+    if not from_city or not from_state:
         return
 
+    if not to_city or not to_state:
+        return
+
+    if not travel_date:
+        return
+
+    if not post_details or len(post_details) > 300:
+        #post details invalid or exceed maximum length
+        return
+
+    #validate cities and states
+    if from_city.lower() not in us_cities or from_state.lower() not in us_states:
+        #invalid starting city or state
+        return
+
+    if to_city.lower() not in us_cities or to_state.lower() not in us_states:
+        #invalid destination city or state
+        return
+
+    #validate travel date 
+    try:
+        from datetime import datetime
+        travel_date_obj = datetime.strptime(travel_date, '%Y-%m-%d').date()
+        today = datetime.now().date()
+        if travel_date_obj < today:
+            return
+    except ValueError:
+        return
+
+    #Create the post
     postData = {
-        "from_city": html.escape(data.get("from_city", "")),
-        "from_state": html.escape(data.get("from_state", "")),
-        "to_city": html.escape(data.get("to_city", "")),
-        "to_state": html.escape(data.get("to_state", "")),
-        "travel_date": html.escape(data.get("travel_date", "")),
-        "post_details": html.escape(postDetails),
+        "from_city": html.escape(from_city),
+        "from_state": html.escape(from_state),
+        "to_city": html.escape(to_city),
+        "to_state": html.escape(to_state),
+        "travel_date": html.escape(travel_date),
+        "post_details": html.escape(post_details),
         "username": user["username"],
         "pfpsrc": pfpsource,
         "uniqueid": str(uuid4()),
@@ -410,7 +507,7 @@ def logout():
 #####################################################################
 
 app.config['UPLOAD_FOLDER'] = '/app/userUploads'
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024 
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
@@ -426,45 +523,60 @@ def profile():
 
     #load their current data
     if request.method == 'GET':
-        firstname = user.get("firstnm", "enter first name")
-        lastname = user.get("lastnm", "enter last name")
-        
         pfpsource = user.get("pfpsrc", "/static/images/default.png")
+        bio = user.get("bio", "")  #Get existing bio or empty string
+        
         if pfpsource.startswith("/app/userUploads/"):
             pfpsource = pfpsource.replace("/app/userUploads/", "/userUploads/")
         
         xsrfToken = secrets.token_hex(32)
+        usercred_collection.update_one(
+            {"authtoken": hashedtoken}, 
+            {"$set": {"xsrf_token": xsrfToken}}
+        )
+        
+        return render_template('profile.html', 
+                             usrnm=user["username"], 
+                             pfpsrc=pfpsource, 
+                             bio=bio,
+                             xsrf_token=xsrfToken)
 
-        usercred_collection.update_one({"authtoken": hashedtoken}, {"$set": {"xsrf_token": xsrfToken}})
-        return render_template('profile.html', usrnm=user["username"], firstnm=firstname, lastnm=lastname, pfpsrc=pfpsource, xsrf_token=xsrfToken)
-
-    #update their data
-    if request.method == 'POST': 
-        newusername = html.escape(request.form.get('username'))
-        newfirstnm = html.escape(request.form.get('first_name'))
-        newlastnm = html.escape(request.form.get('last_name'))
-
-        oldusername = user["username"]
-
+    #updte data
+    if request.method == 'POST':
+        #new bio
+        new_bio = html.escape(request.form.get('bio', ''))
+        
+        #andle profile picture upload
         pfppath = user.get("pfpsrc", "/static/images/default.png")
-
         if 'profile_picture' in request.files:
             file = request.files['profile_picture']
             if file.filename != '':
                 filename = secure_filename(file.filename)
                 pfppath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(pfppath)
-
+                
                 if not is_image(pfppath):
                     os.remove(pfppath)
                     pfppath = "/static/images/default.png"
-
+        
         pfppath = pfppath.replace("/app/userUploads/", "/userUploads/")
         
-        TI_collection.update_many({"username": oldusername}, {"$set": {"username": newusername, "pfpsrc": pfppath}})
-        usercred_collection.update_one({"username": oldusername}, {"$set": {"username": newusername, "firstnm": newfirstnm, "lastnm": newlastnm, "pfpsrc": pfppath}})
+        #update user document with new bio and profile picture
+        usercred_collection.update_one(
+            {"username": user["username"]}, 
+            {"$set": {
+                "bio": new_bio,
+                "pfpsrc": pfppath
+            }}
+        )
+        
+        #update profile picture in travel posts
+        TI_collection.update_many(
+            {"username": user["username"]}, 
+            {"$set": {"pfpsrc": pfppath}}
+        )
+        
         return redirect(url_for('profile'))
-
 
 @app.route('/userUploads/<filename>')
 def uploaded_file(filename):
@@ -609,12 +721,17 @@ def is_image(file_path):
     return False  
 ####################################################################################################################################################################################
 
+cities = []
 
 
 
 
-
-
+@app.before_request
+def before_request():
+    if not check_rate_limit():
+        response = make_response("Too many requests. Please try again in 30 seconds.", 429)
+        response.headers["Retry-After"] = "30"
+        return response
 
 
 @app.after_request
