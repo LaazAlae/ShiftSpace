@@ -9,7 +9,6 @@ I implemented a synchronized dark/light mode theme system that:
 - Persists user theme preferences in the database
 - Synchronizes theme across all pages
 - Defaults to dark mode for new users
-- Updates in real-time across multiple browser tabs
 - Maintains consistency during navigation and page refreshes
 
 This feature enhances user experience by:
