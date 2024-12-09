@@ -1,0 +1,63 @@
+  Website Link: "https://friendsgotogether.com/"
+
+
+
+Additional Feature: Theme Persistence & Synchronization
+
+Feature Description
+I implemented a synchronized dark/light mode theme system that:
+- Persists user theme preferences in the database
+- Synchronizes theme across all pages
+- Defaults to dark mode for new users
+- Updates in real-time across multiple browser tabs
+- Maintains consistency during navigation and page refreshes
+
+This feature enhances user experience by:
+1. Saving user preferences permanently (not just in local storage)
+2. Providing consistent visuals across the entire application
+3. Respecting user preferences across different devices and sessions
+4. Offering an accessible interface for different lighting conditions
+5. Maintaining theme state during all user interactions
+
+This feature goes beyond any existing project requirements by:
+Creating a system-wide visual state management that wasn't covered in any UI/UX requirements
+Adding accessibility considerations
+Creating a default state system with override capabilities
+Adding user customization features that extend beyond the basic profile and authentication systems previously required
+
+Testing Procedure
+
+Initial Setup
+1. Create a new account or log in to an existing account
+2. Note the default dark theme
+
+Theme Toggle Test
+1. Click the light mode toggle button (sun icon) in the sidebar
+2. Verify the interface changes to light mode
+3. Refresh the page
+4. Verify light mode persists after refresh
+
+Multi-Page Consistency Test
+1. While in light mode, navigate to your profile page
+2. Verify the profile page loads in light mode
+4. Return to the home page
+3. Toggle back to dark mode
+5. navigate to your profile page
+6. Verify the profile page loads in dark mode
+
+
+
+### Persistence Test
+1. Set your preferred theme
+2. Log out of your account
+3. Log back in
+4. Verify your theme preference is restored
+
+### Default State Test
+1. Create a new account
+2. Verify the default dark theme is applied
+3. Change to light theme
+4. Log out and back in
+5. Verify light theme preference is maintained
+
+All tests should pass with immediate visual feedback and no page reloads required for theme changes.
