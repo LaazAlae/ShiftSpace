@@ -7,10 +7,11 @@
     <link rel="shortcut icon" type="image/x-icon" href="/static/images/favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
 </head>
-<body onload="start();">
+<body onload="start(); initializeTheme();">
 <script src="https://cdn.socket.io/3.1.3/socket.io.min.js"></script>
 <script>
 const usrnm = "{{usrnm}}";
+const theme_mode = "{{theme_mode}}";
 
 function toggleCollapsible(sectionId) {
     // Get both headers and contents
@@ -54,6 +55,28 @@ function goHome() {
     document.getElementById('home-btn').classList.add('active');
     window.location.href = '/';
 }
+
+function initializeTheme() {
+    if (theme_mode === 'light') {
+        document.body.classList.add('light-mode');
+    }
+}
+
+function toggleLightMode() {
+    document.body.classList.toggle('light-mode');
+    const isLightMode = document.body.classList.contains('light-mode');
+    
+    fetch('/update_theme', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': document.getElementById('xsrf_token').value
+        },
+        body: JSON.stringify({
+            theme_mode: isLightMode ? 'light' : 'dark'
+        })
+    });
+}
 </script>
     <div class="site-layout">
     <div class="sidebar">
@@ -74,6 +97,9 @@ function goHome() {
             </button>
             <button id="logout-btn" class="action-button" onclick="document.querySelector('form[action=\'/logout\']').submit()">
                 <span class="material-symbols-outlined">logout</span>
+            </button>
+            <button class="action-button" onclick="toggleLightMode()">
+                <span class="material-symbols-outlined">light_mode</span>
             </button>
         </div>
 
@@ -211,7 +237,13 @@ function goHome() {
 
 <div id="comment-modal" class="modal">
     <div class="modal-content">
-        <span class="close-button" onclick="closeCommentModal()">&times;</span>
+        <div class="modal-header">
+            <span class="close-button" onclick="closeCommentModal()">&times;</span>
+            <div id="comment-status-container">
+                <div id="comment-status-title">Comments close after travel date</div>
+                <div id="comment-countdown" style="margin-top: 5px; font-size: 14px;"></div>
+            </div>
+        </div>
         <div id="modal-comments" class="modal-comments"></div>
         <div class="comment-input-container">
             <textarea id="new-comment" placeholder="Write a comment..." rows="2"></textarea>

@@ -629,29 +629,101 @@ function handleSave(messageId) {
 }
 
 function handleComment(messageId) {
-    openCommentModal(messageId);
+    socket.emit('request_time', { messageId });
+
+    socket.once('response_time', (data) => {
+        const serverTime = new Date(data.server_time);   
+        const travelDate = new Date(data.travel_date); 
+
+        travelDate.setHours(travelDate.getHours() + 5);
+
+        console.log("ogdate", travelDate);  
+
+        openCommentModal(messageId, serverTime, travelDate); 
+    });
 }
 
 
 
 
-function openCommentModal(messageId) {
+function updateCountdown(serverTime, travelDate) {
+    const countdownElement = document.getElementById('comment-countdown');
+    const statusTitle = document.getElementById('comment-status-title');
+    
+    const serverDateTime = new Date(serverTime);
+    const travelDateTime = new Date(travelDate);
+    
+    if (serverDateTime > travelDateTime) {
+        statusTitle.textContent = 'Comment Section Closed';
+        countdownElement.textContent = 'Travel date has passed';
+        
+        const newCommentInput = document.getElementById('new-comment');
+        const sendButton = newCommentInput.nextElementSibling;
+        newCommentInput.disabled = true;
+        sendButton.disabled = true;
+        newCommentInput.placeholder = 'Comments are closed';
+        return;
+    }
+
+    const timeDiff = travelDateTime - serverDateTime;
+    console.log(travelDateTime)
+    console.log(serverDateTime)
+    console.log(timeDiff)
+    
+    const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+    
+    const countdownText = `Time remaining: ${days} days ${hours} hours ${minutes} minutes ${seconds} seconds`;
+    
+    statusTitle.textContent = 'Comments close after travel date';
+    countdownElement.textContent = countdownText;
+}
+
+
+function openCommentModal(messageId, serverTime, travelDate) {
     currentMessageId = messageId;
     const modal = document.getElementById("comment-modal");
     const newCommentInput = document.getElementById("new-comment");
-
+    
     modal.style.display = "flex";
     newCommentInput.value = '';
-
     newCommentInput.addEventListener("keypress", handleCommentKeyPress);
-
+    
+    let currentServerTime = new Date(serverTime);  
+    updateCountdown(currentServerTime, travelDate);
+    
+    const countdownInterval = setInterval(() => {
+        currentServerTime = new Date(currentServerTime.getTime() + 1000);
+        updateCountdown(currentServerTime, travelDate);
+    }, 1000);
+    
+    modal.dataset.countdownInterval = countdownInterval;
+    
     const post = info.find(item => item.uniqueid === messageId);
     if (post) {
         updateCommentModal(post);
     }
-
+    
     newCommentInput.focus();
     modal.classList.add('active');
+}
+
+
+function closeCommentModal() {
+    const modal = document.getElementById("comment-modal");
+    const newCommentInput = document.getElementById("new-comment");
+    
+    //Clear countdown interval
+    if (modal.dataset.countdownInterval) {
+        clearInterval(Number(modal.dataset.countdownInterval));
+        delete modal.dataset.countdownInterval;
+    }
+    
+    modal.style.display = "none";
+    newCommentInput.removeEventListener("keypress", handleCommentKeyPress);
+    modal.classList.remove('active');
 }
 
 
@@ -663,16 +735,6 @@ function handleCommentKeyPress(event) {
 }
 
 
-
-function closeCommentModal() {
-    const modal = document.getElementById("comment-modal");
-    modal.style.display = "none";
-    currentMessageId = null;
-
-    const newCommentInput = document.getElementById("new-comment");
-    newCommentInput.removeEventListener("keypress", handleCommentKeyPress);
-    modal.classList.remove('active');
-}
 
 // Add event listener to close modal when clicking outside
 document.getElementById("comment-modal").addEventListener('click', function (event) {

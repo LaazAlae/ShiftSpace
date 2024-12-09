@@ -3,21 +3,26 @@ eventlet.monkey_patch()
 
 
 from flask import Flask, render_template, redirect, request, url_for, make_response, jsonify, send_from_directory
-from flask_socketio import SocketIO, emit
+from collections import defaultdict, deque
 from werkzeug.utils import secure_filename
-from pymongo import MongoClient, DESCENDING
+from flask_socketio import SocketIO, emit
+from flask import request, make_response
+from pymongo import MongoClient
+from datetime import datetime
+from functools import wraps
 from hashlib import sha256
 from uuid import uuid4
+from time import time
 import filetype
 import secrets
 import bcrypt
 import uuid
 import html
 import os
-from collections import defaultdict, deque
+from collections import defaultdict
 from time import time
-from functools import wraps
 from flask import request, make_response
+from pytz import timezone, utc
 
 
 app = Flask(__name__)
@@ -33,46 +38,36 @@ socketio = SocketIO(app,
 
 #DOs Protection
 ####################################################################################################################################################################################
-#track requests based on IP
 ip_requests = defaultdict(deque)
-# Track blocked IPs with their block timestamp
 blocked = {}
 
+def get_real_ip():
+    return request.headers.get('X-Real-IP', request.remote_addr)
+
 def check_rate_limit():
-    ip = request.remote_addr
+    ip = get_real_ip()
+    print(f"IP Address: {ip}")
     current_time = time()
     
     if ip in blocked:
-        #unblock after 30
         if current_time - blocked[ip] >= 30:
             del blocked[ip]
             ip_requests[ip].clear()
         else:
             return False
-    
-    #current request time
+            
     ip_requests[ip].append(current_time)
     
-    #remove requests older than 10s
     while ip_requests[ip] and current_time - ip_requests[ip][0] > 10:
         ip_requests[ip].popleft()
+        request_count = len(ip_requests[ip])
+        print(f"Request count for {ip}: {request_count}")
     
     if len(ip_requests[ip]) > 50:
-        #block ip
         blocked[ip] = current_time
         return False
     
     return True
-
-def rate_limit(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not check_rate_limit():
-            response = make_response("Too many requests. Please try again in 30 seconds.", 429)
-            response.headers["Retry-After"] = "30"
-            return response
-        return f(*args, **kwargs)
-    return decorated_function
 #######################################################################################################################################################################################################################
 
 
@@ -106,22 +101,48 @@ with open(os.path.join(BASE_DIR, 'us-states.txt'), 'r') as f:
 @app.route('/')
 def home():
     authtoken = request.cookies.get('authtoken')
-
     hashedtoken = (sha256(str(authtoken).encode('utf-8'))).hexdigest()
-
     user = usercred_collection.find_one({"authtoken": hashedtoken})
-
     if not user:
         return redirect(url_for('login'))
     
     xsrfToken = secrets.token_hex(32)
-
-    usercred_collection.update_one({"authtoken": hashedtoken},{"$set": {"xsrf_token": xsrfToken}})
-
-    return render_template('index.html', usrnm = user["username"], xsrf_token = xsrfToken )
+    theme_mode = user.get('theme_mode', 'dark')
+    
+    usercred_collection.update_one(
+        {"authtoken": hashedtoken},
+        {
+            "$set": {
+                "xsrf_token": xsrfToken,
+                "theme_mode": theme_mode
+            }
+        }
+    )
+    
+    return render_template(
+        'index.html', 
+        usrnm=user["username"], 
+        xsrf_token=xsrfToken,
+        theme_mode=theme_mode
+    )
 ####################################################################################################################################################################################    
 
 
+
+
+####################################################################################################################################################################################
+@app.route('/update_theme', methods=['POST'])
+def update_theme():
+    authtoken = request.cookies.get('authtoken')
+    hashedtoken = (sha256(str(authtoken).encode('utf-8'))).hexdigest()
+    theme_mode = request.json.get('theme_mode')
+    
+    usercred_collection.update_one(
+        {"authtoken": hashedtoken},
+        {"$set": {"theme_mode": theme_mode}}
+    )
+    return jsonify({"status": "success"})
+####################################################################################################################################################################################
 
 
 
@@ -212,7 +233,6 @@ def newPost(data):
 
     #validate travel date 
     try:
-        from datetime import datetime
         travel_date_obj = datetime.strptime(travel_date, '%Y-%m-%d').date()
         today = datetime.now().date()
         if travel_date_obj < today:
@@ -286,8 +306,43 @@ def search_posts():
 
 
 ####################################################################################################################################################################################
+@socketio.on('request_time')
+def handle_time_request(data):
+    from datetime import datetime, timedelta
+    import pytz
+
+    est = pytz.timezone('America/New_York')
+
+    message_id = data.get('messageId')
+    post = TI_collection.find_one({"uniqueid": message_id})
+    travel_date = post.get('travel_date')
+    
+    travel_date_obj = datetime.fromisoformat(travel_date)
+    travel_date_obj = est.localize(travel_date_obj)
+    travel_date_obj = travel_date_obj + timedelta(days=1)
+    travel_date_str = travel_date_obj.strftime('%Y-%m-%d')
+    
+    server_time_est = datetime.now(est).isoformat()
+
+    print("travel_date:", travel_date_str)
+    print("time now:", server_time_est)
+
+    emit('response_time', {
+        'server_time': server_time_est,
+        'travel_date': travel_date_str
+    }, room=request.sid)
+
+#####################################################################
+
 @socketio.on('updateInteractions')
 def updateInteractions(data):
+    from datetime import datetime
+    import pytz
+    import html
+    from hashlib import sha256
+
+    est = pytz.timezone('America/New_York')
+
     authtoken = request.cookies.get('authtoken')
     user = usercred_collection.find_one({"authtoken": sha256(str(authtoken).encode('utf-8')).hexdigest()})
     if not user or data.get("xsrf_token") != user.get("xsrf_token"):
@@ -303,7 +358,6 @@ def updateInteractions(data):
     action = data.get("action")
 
     if action == "like":
-        #toggle like
         likes = post.get("likes", [])
         if username in likes:
             likes.remove(username)
@@ -312,7 +366,6 @@ def updateInteractions(data):
         post["likes"] = likes
 
     elif action == "save":
-        #toggle save
         saves = post.get("saves", [])
         if username in saves:
             saves.remove(username)
@@ -321,10 +374,20 @@ def updateInteractions(data):
         post["saves"] = saves
 
     elif action == "comment":
+        travel_date_str = post.get('travel_date')
+        travel_date_obj = datetime.fromisoformat(travel_date_str)
+        travel_date_obj = est.localize(travel_date_obj)
+        travel_date_obj = travel_date_obj.replace(hour=23, minute=59, second=59)
+        print("comment date: ", travel_date_obj)
+        current_time_est = datetime.now(est)
+        if current_time_est > travel_date_obj:
+            return
+        
         comment_text = data.get("comment_text", "").strip()
         if not comment_text:
             emit('error', {'message': 'Comment text is empty'}, room=request.sid)
             return
+        
         comment = {
             "username": username,
             "text": html.escape(comment_text)
@@ -337,14 +400,11 @@ def updateInteractions(data):
         emit('error', {'message': 'Invalid action'}, room=request.sid)
         return
 
-    #update post in the db
     TI_collection.update_one({"uniqueid": data["messageId"]}, {"$set": post})
 
-    #convert ObjectId to string to avoid bug
     if '_id' in post:
         post['_id'] = str(post['_id'])
 
-    #emit updated post to clients
     emit('update_interaction', post, broadcast=True)
 
 #############################################
@@ -524,7 +584,8 @@ def profile():
     #load their current data
     if request.method == 'GET':
         pfpsource = user.get("pfpsrc", "/static/images/default.png")
-        bio = user.get("bio", "")  #Get existing bio or empty string
+        bio = user.get("bio", "")  
+        theme_mode = user.get("theme_mode", "dark")
         
         if pfpsource.startswith("/app/userUploads/"):
             pfpsource = pfpsource.replace("/app/userUploads/", "/userUploads/")
@@ -539,6 +600,7 @@ def profile():
                              usrnm=user["username"], 
                              pfpsrc=pfpsource, 
                              bio=bio,
+                             theme_mode=theme_mode,
                              xsrf_token=xsrfToken)
 
     #updte data
@@ -726,12 +788,11 @@ cities = []
 
 
 
+
 @app.before_request
 def before_request():
     if not check_rate_limit():
-        response = make_response("Too many requests. Please try again in 30 seconds.", 429)
-        response.headers["Retry-After"] = "30"
-        return response
+        return make_response("Too many requests. Please try again in 30 seconds.", 429)
 
 
 @app.after_request
